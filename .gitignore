@@ -1,3 +1,12 @@
-.env 
+.env
 context_playwright/*
-context_test_cases/* 
+context_test_cases/*
+.venv/
+artifacts/
+# Python interpreter artefacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+# End of interpreter artefacts
