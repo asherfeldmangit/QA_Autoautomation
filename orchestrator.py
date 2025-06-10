@@ -5,6 +5,7 @@ from pathlib import Path
 from Agents.TC_GENERATOR_AGENT.test_writer_main import TestCaseGeneratorAgent
 from Agents.CODER_AGENT.test_automator_main import CoderAgentShell
 from Agents.CODE_REVIEWER_AGENT.test_reviewer_main import CodeReviewerAgent
+import argparse
 
 
 class Orchestrator:
@@ -48,15 +49,10 @@ class Orchestrator:
             model=self.model,
         )
         self.reviewer = CodeReviewerAgent(
-            # The CoderAgent now produces JavaScript Playwright tests (`*.spec.js`).
-            # Point the reviewer to the correct file extension so that it can run the right runtime check.
             test_file_path=self.code_dir / "test_generated.spec.js",
             model=self.model,
         )
 
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
     def run(self) -> None:
         """Execute the full agent pipeline."""
         print("[Orchestrator] Generating test cases from XML …")
@@ -72,7 +68,6 @@ class Orchestrator:
                 print("[Orchestrator] ✅ Test suite passed review!")
                 break
 
-            # Surface the exact failure details before handing the feedback back to the Coder agent.
             print("[Orchestrator] ❌ Review failed – feeding feedback back to coder agent …")
             print("[Orchestrator] Reviewer feedback:\n" + feedback)
             self.coder.improve_code(feedback)
@@ -81,8 +76,6 @@ class Orchestrator:
 
 
 if __name__ == "__main__":
-    import argparse
-
     parser = argparse.ArgumentParser(description="End-to-end QA Automation Orchestrator")
     parser.add_argument("xml", help="Path to a TestRail XML export containing test cases")
     parser.add_argument(
