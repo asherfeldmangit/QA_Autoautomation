@@ -50,7 +50,7 @@ npx --yes playwright install --with-deps
 Export the desired suite from TestRail as **XML** and drop it into the repository, e.g.
 
 ```
-context_test_cases/my_suite.xml
+context/context_test_cases/my_suite.xml
 ```
 
 ### 3. Add context for the Coder Agent  *(optional but highly recommended)*
@@ -73,7 +73,7 @@ Any environment variable recognised by the official `openai` Python SDK will wor
 ### 5. Run the orchestrator 🎬
 
 ```bash
-python orchestrator.py context_test_cases/my_suite.xml \
+python orchestrator.py context/context_test_cases/my_suite.xml \
   --work-dir artifacts \
   --model gpt-4o-mini \
   --max-review-cycles 3
@@ -98,7 +98,7 @@ Prompt engineering is the easiest lever for quality! Tweak the instructions, cha
 │  ├─ TC_GENERATOR_AGENT/
 │  ├─ CODER_AGENT/
 │  └─ CODE_REVIEWER_AGENT/
-├─ context_test_cases/       # 👉 put your XML files here
+├─ context/context_test_cases/       # 👉 put your XML files here
 ├─ context_playwright/       # 👉 optional Playwright helpers/specs for context
 └─ artifacts/                # ⏩ auto-generated JSON & test code
 ```

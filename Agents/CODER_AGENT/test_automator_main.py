@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from dotenv import load_dotenv  # noqa: WPS433 – runtime import required before openai
 from openai import OpenAI
@@ -38,6 +39,7 @@ class CoderAgentShell:
         """
         self._load_test_cases()
         code_str = self._generate_code()
+        code_str = self._sanitize_code(code_str)
         return str(self._save_code(code_str))
 
     def improve_code(self, feedback: str) -> str:
@@ -64,34 +66,82 @@ class CoderAgentShell:
             messages=[{"role": "user", "content": prompt}],
         )
         improved_code = response.choices[0].message.content
+        improved_code = self._sanitize_code(improved_code)
         return str(self._save_code(improved_code))
 
     # ---------------------------------------------------------------------
     # Internal helpers
     # ---------------------------------------------------------------------
     def _load_test_cases(self) -> None:
+        """Populate :pyattr:`test_cases` from the JSON blob on disk.
+
+        The method is intentionally *private* because it mutates internal state without returning a value.
+        It is always followed by a call to :meth:`_generate_code` in the public :meth:`run` wrapper.
+        """
         with self.test_case_json_path.open() as f:
             self.test_cases = json.load(f)
 
     def _build_prompt(self) -> str:
+        """Craft the prompt that instructs the LLM to emit Playwright tests.
+
+        Besides the `TEST_CASES_JSON`, the prompt also injects **selected** helper files from the
+        `context_playwright/` directory so that the generated code is stylistically aligned with the
+        existing suite. Only small, *relevant* files are included to keep token usage reasonable.
+
+        Returns:
+            The fully assembled prompt ready to be passed to OpenAI.
+        """
         json_blob = json.dumps(self.test_cases, indent=2)
 
         # ------------------------------------------------------------------
-        # Gather additional context from the Playwright helper scripts
+        # Locate the Playwright project context directory.
+        # The folder may live directly under the project root *or* inside a
+        # nested `context/` folder depending on how the repository is laid out.
+        # We resolve the first path that exists to remain backwards compatible
+        # with both structures.
         # ------------------------------------------------------------------
-        project_root = Path(__file__).resolve().parent.parent.parent
-        context_dir = project_root / "context_playwright"
+        candidate_dirs = [
+            Path(__file__).resolve().parent.parent.parent / "context_playwright",
+            Path(__file__).resolve().parent.parent.parent / "context" / "context_playwright",
+        ]
 
+        context_dir = next((d for d in candidate_dirs if d.exists()), None)
+
+        # --------------------------------------------------------------
+        # Selectively import only *key* Playwright helper files to keep the
+        # prompt size manageable. We purposefully exclude entire test suites
+        # or heavyweight files that do not aid code generation.
+        # --------------------------------------------------------------
         context_parts: list[str] = []
-        if context_dir.exists():
-            for file_path in context_dir.glob("**/*"):
-                if file_path.is_file():
-                    try:
-                        file_content = file_path.read_text()
-                    except Exception:
-                        # Any unreadable file is skipped to avoid breaking the prompt
-                        file_content = ""
-                    context_parts.append(f"FILE: {file_path.name}\\n{file_content}")
+        if context_dir:  # pragma: no branch – defensive, should usually exist
+            allowed_base_dirs = {"utils", "globals", "locators"}
+            always_include_files = {"playwright.config.js"}
+
+            for file_path in context_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                rel_parts = file_path.relative_to(context_dir).parts
+
+                # Decide whether to include this file.
+                include = (
+                    rel_parts[0] in allowed_base_dirs  # e.g. utils/..., globals/...
+                    or file_path.name in always_include_files
+                )
+
+                # Additionally filter by file size to avoid extremely large files (>30 KB)
+                include = include and file_path.stat().st_size < 30_000
+
+                if not include:
+                    continue
+
+                try:
+                    file_content = file_path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    # Any unreadable file is skipped to avoid breaking the prompt
+                    file_content = ""
+
+                context_parts.append(f"FILE: {file_path.name}\\n{file_content}")
 
         context_blob = "\n\n".join(context_parts)
 
@@ -106,6 +156,8 @@ class CoderAgentShell:
         )
 
     def _generate_code(self) -> str:
+        """Send the prompt to the LLM and return the raw JavaScript code string."""
+
         prompt = self._build_prompt()
         response = self.openai.chat.completions.create(
             model=self.model,
@@ -119,3 +171,21 @@ class CoderAgentShell:
         output_path.write_text(code_str)
         print(f"Test code written to {output_path}")
         return output_path
+
+    # ---------------------------------------------------------------------
+    # Code post-processing helpers
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def _sanitize_code(code_str: str) -> str:
+        """Perform lightweight post-processing to ensure syntactically valid JS.
+
+        Particularly, replace invalid placeholder assignments like:
+
+            const foo = /* retrieve or define foo */;
+
+        with a string literal stub so that the file remains valid JavaScript.
+        """
+
+        # Matches "= /* ... */;" (optionally with whitespace around the equals sign)
+        placeholder_pattern = re.compile(r"=\s*/\*.*?\*/;", re.DOTALL)
+        return placeholder_pattern.sub("= '';// TODO: provide value;", code_str)

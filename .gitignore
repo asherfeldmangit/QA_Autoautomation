@@ -1,6 +1,6 @@
 .env
-context_playwright/*
-context_test_cases/*
+context/context_playwright/*
+context/context_test_cases/*
 .venv/
 artifacts/
 # Python interpreter artefacts
@@ -10,3 +10,13 @@ __pycache__/
 *.pyd
 *.pyc
 # End of interpreter artefacts
+
+# ------------------------------------------------------------------
+# Node.js & Playwright artefacts (generated at runtime – never commit)
+# ------------------------------------------------------------------
+node_modules/
+
+# Playwright
+playwright-report/
+test-results/
+.cache/ms-playwright/

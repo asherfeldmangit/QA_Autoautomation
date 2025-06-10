@@ -127,16 +127,41 @@ class CodeReviewerAgent:
     def _collect_context_playwright(self) -> str:
         """Aggregate the raw content of files in the `context_playwright` directory."""
         project_root = Path(__file__).resolve().parent.parent.parent
-        context_dir = project_root / "context_playwright"
+
+        # Support both `<root>/context_playwright` and `<root>/context/context_playwright` layouts.
+        candidate_dirs = [
+            project_root / "context_playwright",
+            project_root / "context" / "context_playwright",
+        ]
+
+        context_dir = next((d for d in candidate_dirs if d.exists()), None)
 
         context_parts: list[str] = []
-        if context_dir.exists():
-            for file_path in context_dir.glob("**/*"):
-                if file_path.is_file():
-                    try:
-                        content = file_path.read_text()
-                    except Exception:
-                        content = ""
-                    context_parts.append(f"FILE: {file_path.name}\\n{content}")
+        if context_dir:  # pragma: no branch – defensive
+            allowed_base_dirs = {"utils", "globals", "locators"}
+            always_include_files = {"playwright.config.js"}
+
+            for file_path in context_dir.rglob("*"):
+                if not file_path.is_file():
+                    continue
+
+                rel_parts = file_path.relative_to(context_dir).parts
+
+                include = (
+                    rel_parts[0] in allowed_base_dirs
+                    or file_path.name in always_include_files
+                )
+
+                include = include and file_path.stat().st_size < 30_000
+
+                if not include:
+                    continue
+
+                try:
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    content = ""
+
+                context_parts.append(f"FILE: {file_path.name}\\n{content}")
 
         return "\n\n".join(context_parts) 

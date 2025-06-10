@@ -1,0 +1,16 @@
+{
+  "name": "qa_autoautomation",
+  "version": "1.0.0",
+  "description": "[![Python](https://img.shields.io/badge/python-3.12%2B-blue?logo=python)](https://www.python.org/)   [![Node](https://img.shields.io/badge/node-18%2B-green?logo=node.js)](https://nodejs.org/)   [![Playwright](https://img.shields.io/badge/Playwright-1.51.0-yellowgreen?logo=microsoft)](https://playwright.dev/)   [![OpenAI](https://img.shields.io/badge/Powered_by-GPT--4o--mini-ff69b4?logo=openai)](https://openai.com/)   [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "playwright": "^1.51.0",
+    "@playwright/test": "^1.51.0"
+  }
+}

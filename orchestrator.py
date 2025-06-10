@@ -17,6 +17,14 @@ class Orchestrator:
         model: str = "gpt-4o-mini",
         max_review_cycles: int = 3,
     ) -> None:
+        """Create a new orchestrator instance.
+
+        Args:
+            xml_path: Path to the **TestRail XML** export that acts as the single source of truth for the tests.
+            work_dir: Directory where *all* intermediate artefacts (JSON, generated code, runtime logs) will be stored.
+            model: OpenAI model ID passed on to the individual agents. Allows you to override it from the CLI.
+            max_review_cycles: Safety valve – if the Reviewer agent still fails after *n* feedback loops, the run aborts.
+        """
         self.xml_path = Path(xml_path)
         self.work_dir = Path(work_dir)
         self.work_dir.mkdir(exist_ok=True, parents=True)
